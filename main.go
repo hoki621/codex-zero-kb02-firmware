@@ -85,6 +85,7 @@ func main() {
 				keyReported[i] = false
 			}
 			encoderButtonReported = false
+			encoder.reset(machine.GPIO3.Get(), machine.GPIO4.Get())
 			reportGeneration = protocol.generation
 		}
 

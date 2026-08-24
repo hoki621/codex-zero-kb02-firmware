@@ -40,6 +40,33 @@ func TestEncoderProducesOneEventPerDetent(t *testing.T) {
 	}
 }
 
+func TestEncoderResetDropsPartialOfflineDetent(t *testing.T) {
+	var decoder encoderDecoder
+	for _, pins := range [][2]bool{{false, false}, {true, false}, {true, true}, {false, true}} {
+		if event := decoder.update(pins[0], pins[1]); event != "" {
+			t.Fatalf("partial detent event=%q", event)
+		}
+	}
+
+	decoder.reset(false, true)
+	if event := decoder.update(false, false); event != "" {
+		t.Fatalf("pre-session edge replayed as %q", event)
+	}
+
+	events := 0
+	for _, pins := range [][2]bool{{true, false}, {true, true}, {false, true}, {false, false}} {
+		if event := decoder.update(pins[0], pins[1]); event != "" {
+			events++
+			if event != "CW" {
+				t.Fatalf("fresh detent event=%q", event)
+			}
+		}
+	}
+	if events != 1 {
+		t.Fatalf("fresh detent events=%d", events)
+	}
+}
+
 func TestJoystickRequiresNeutralBeforeRepeating(t *testing.T) {
 	decoder := joystickDecoder{calibration: zeroKB02Joystick}
 	for range 100 {

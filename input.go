@@ -73,14 +73,14 @@ type encoderDecoder struct {
 
 var encoderTransitions = [16]int8{0, -1, 1, 0, 1, 0, 0, -1, -1, 0, 0, 1, 0, 1, -1, 0}
 
+func (d *encoderDecoder) reset(a, b bool) {
+	d.initialized = true
+	d.state = encoderState(a, b)
+	d.steps = 0
+}
+
 func (d *encoderDecoder) update(a, b bool) string {
-	next := uint8(0)
-	if a {
-		next |= 2
-	}
-	if b {
-		next |= 1
-	}
+	next := encoderState(a, b)
 	if !d.initialized {
 		d.initialized = true
 		d.state = next
@@ -103,6 +103,17 @@ func (d *encoderDecoder) update(a, b bool) string {
 		return "CCW"
 	}
 	return ""
+}
+
+func encoderState(a, b bool) uint8 {
+	state := uint8(0)
+	if a {
+		state |= 2
+	}
+	if b {
+		state |= 1
+	}
+	return state
 }
 
 type joystickCalibration struct {
