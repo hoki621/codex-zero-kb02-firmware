@@ -1,0 +1,41 @@
+#!/usr/bin/expect -f
+
+set timeout 60
+log_file -noappend /private/tmp/zero-kb02-joystick-diagnostic.log
+set saw_header 0
+set next_phase 0
+set phases {center up down left right}
+set counts {100 40 40 40 40}
+
+proc stop_capture {code} {
+	send -- "\003"
+	after 500
+	close
+	wait
+	exit $code
+}
+
+spawn tinygo monitor -port /dev/cu.usbmodemzero_kb02_diag1
+expect {
+	-re {JOYSTICK_DIAGNOSTIC v2 DTR [123]} {
+		set saw_header 1
+		exp_continue -continue_timer
+	}
+	-re {SUMMARY ([a-z]+) ([0-9]+)} {
+		if {$next_phase >= [llength $phases] ||
+			$expect_out(1,string) ne [lindex $phases $next_phase] ||
+			$expect_out(2,string) ne [lindex $counts $next_phase]} {
+			stop_capture 2
+		}
+		incr next_phase
+		exp_continue -continue_timer
+	}
+	-re {[\r\n]DONE[\r\n]} {
+		if {!$saw_header || $next_phase != [llength $phases]} {
+			stop_capture 2
+		}
+		stop_capture 0
+	}
+	timeout { stop_capture 124 }
+	eof { exit 1 }
+}
