@@ -96,11 +96,11 @@ func (d *encoderDecoder) update(a, b bool) string {
 	d.steps += delta
 	if d.steps >= 4 {
 		d.steps = 0
-		return "CCW"
+		return "CW"
 	}
 	if d.steps <= -4 {
 		d.steps = 0
-		return "CW"
+		return "CCW"
 	}
 	return ""
 }
