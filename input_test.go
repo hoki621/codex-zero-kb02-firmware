@@ -17,26 +17,28 @@ func TestDebouncerEmitsOneEdgePerPress(t *testing.T) {
 }
 
 func TestEncoderProducesOneEventPerDetent(t *testing.T) {
-	var clockwise encoderDecoder
-	var events []string
-	for _, pins := range [][2]bool{{false, false}, {true, false}, {true, true}, {false, true}, {false, false}} {
-		if event := clockwise.update(pins[0], pins[1]); event != "" {
-			events = append(events, event)
-		}
-	}
-	if len(events) != 1 || events[0] != "CW" {
-		t.Fatalf("clockwise events=%v", events)
-	}
-
 	var counterclockwise encoderDecoder
-	events = nil
-	for _, pins := range [][2]bool{{false, false}, {false, true}, {true, true}, {true, false}, {false, false}} {
+	var events []string
+	// Physical CCW on this board, recorded as GPIO3 then GPIO4.
+	for _, pins := range [][2]bool{{false, false}, {true, false}, {true, true}, {false, true}, {false, false}} {
 		if event := counterclockwise.update(pins[0], pins[1]); event != "" {
 			events = append(events, event)
 		}
 	}
 	if len(events) != 1 || events[0] != "CCW" {
 		t.Fatalf("counterclockwise events=%v", events)
+	}
+
+	var clockwise encoderDecoder
+	events = nil
+	// Physical CW on this board, recorded as GPIO3 then GPIO4.
+	for _, pins := range [][2]bool{{false, false}, {false, true}, {true, true}, {true, false}, {false, false}} {
+		if event := clockwise.update(pins[0], pins[1]); event != "" {
+			events = append(events, event)
+		}
+	}
+	if len(events) != 1 || events[0] != "CW" {
+		t.Fatalf("clockwise events=%v", events)
 	}
 }
 
@@ -57,7 +59,7 @@ func TestEncoderResetDropsPartialOfflineDetent(t *testing.T) {
 	for _, pins := range [][2]bool{{true, false}, {true, true}, {false, true}, {false, false}} {
 		if event := decoder.update(pins[0], pins[1]); event != "" {
 			events++
-			if event != "CW" {
+			if event != "CCW" {
 				t.Fatalf("fresh detent event=%q", event)
 			}
 		}
