@@ -47,6 +47,7 @@ Sources:
 
 - <https://github.com/sago35/keyboards/tree/ed77415774e25e3adf72d192543b14d10438fb1d/zero-kb02>
 - <https://github.com/tinygo-keeb/workshop/blob/main/README_EN.md>
+- <https://github.com/tinygo-keeb/workshop/tree/main/80_checker>
 
 The workshop is reference-only. No workshop source code is copied here.
 
@@ -76,12 +77,18 @@ GO111MODULE=on tinygo build -o ./out/zero-kb02.uf2 --target waveshare-rp2040-zer
 shasum -a 256 ./out/zero-kb02.uf2
 ```
 
-From this repository, `scripts/build-recovery.sh /path/to/keyboards` performs
-the commit and tool-version checks and builds to a temporary file. It updates
-the UF2 plus `.sha256` under `recovery/` only when the result matches the
-recorded SHA-256; a mismatch fails without overwriting the recovery artifact.
-It also copies the upstream MIT license beside the artifact. It does not clone,
-flash, or open a device.
+From this repository, the following command validates the commit and tool
+versions, then writes a fresh UF2, its actual `.sha256`, and upstream license to
+a new explicit path:
+
+```sh
+scripts/build-recovery.sh /path/to/keyboards /absolute/new-output.uf2
+```
+
+The script refuses relative paths, existing outputs, and the committed recovery
+artifact path, so it cannot overwrite the known-good artifact or hash. A fresh
+build hash may differ for the reason documented below. The script does not
+clone, flash, or open a device.
 
 The checkout, tool versions, build result, output size, and SHA-256 were
 verified on 2026-08-24. No flash or device operation was performed.
@@ -108,9 +115,11 @@ left, and right. Every phase has a three-second prepare countdown. It prints
 raw samples and a min/max/mean summary, prints `DONE` after about 29 seconds,
 then produces no more output. The dedicated capture script opens only
 `/dev/cu.usbmodemzero_kb02_diag1`; one 60-second timer covers the complete
-session. It succeeds only after the banner, ordered summaries with counts
-100/40/40/40/40, and `DONE`; timeout returns 124 and malformed or incomplete
-output returns 2.
+session. It succeeds only after the banner, ordered summaries containing all
+seven numeric fields with counts 100/40/40/40/40, and `DONE`; timeout returns
+124 and malformed, truncated, or incomplete output returns 2. Run
+`scripts/test-capture-joystick-diagnostic.sh` for the valid and truncated
+focused mocks.
 
 The first diagnostic attempt on 2026-08-24 flashed SHA-256
 `1205f9084cbff078eeb75270040b9be0d57a2ec22d30e2736cda56d3bbb80f70`
@@ -132,9 +141,10 @@ and the printed aggregate summaries are excluded.
 
 ## Key and LED order
 
-The matrix wiring establishes the key numbers below. The fixed upstream source
-maps keys to zero-based LED indices as shown, but physical one-at-a-time testing
-is still required before marking the mapping confirmed.
+The matrix wiring establishes the key numbers below. The fixed product source
+and workshop layout map keys to zero-based LED chain indices as shown. The user
+then confirmed `SELF_ONLY` for K1 through K12: each key changed and faded only
+the LED physically below that key, with no wrong-position LED.
 
 | Matrix | COL1 | COL2 | COL3 | COL4 |
 | --- | --- | --- | --- | --- |
@@ -142,20 +152,20 @@ is still required before marking the mapping confirmed.
 | ROW2 | key 5 | key 6 | key 7 | key 8 |
 | ROW3 | key 9 | key 10 | key 11 | key 12 |
 
-| Key | Source LED index | Physical LED | Key result | LED result |
+| Key | LED chain index | Physical LED | Key result | LED result |
 | --- | --- | --- | --- | --- |
-| 1 | 0 | unknown | PASS: `a` | NOT REPORTED |
-| 2 | 3 | unknown | PASS: `b` | NOT REPORTED |
-| 3 | 6 | unknown | PASS: `c` | NOT REPORTED |
-| 4 | 9 | unknown | PASS: `d` | NOT REPORTED |
-| 5 | 1 | unknown | PASS: `e` | NOT REPORTED |
-| 6 | 4 | unknown | PASS: `f` | NOT REPORTED |
-| 7 | 7 | unknown | PASS: `g` | NOT REPORTED |
-| 8 | 10 | unknown | PASS: `h` | NOT REPORTED |
-| 9 | 2 | unknown | PASS: layer modifier | NOT REPORTED |
-| 10 | 5 | unknown | PASS: layer modifier | NOT REPORTED |
-| 11 | 8 | unknown | PASS: left click | NOT REPORTED |
-| 12 | 11 | unknown | PASS: right click | NOT REPORTED |
+| 1 | 0 | under K1 | PASS: `a` | PASS: SELF_ONLY |
+| 2 | 3 | under K2 | PASS: `b` | PASS: SELF_ONLY |
+| 3 | 6 | under K3 | PASS: `c` | PASS: SELF_ONLY |
+| 4 | 9 | under K4 | PASS: `d` | PASS: SELF_ONLY |
+| 5 | 1 | under K5 | PASS: `e` | PASS: SELF_ONLY |
+| 6 | 4 | under K6 | PASS: `f` | PASS: SELF_ONLY |
+| 7 | 7 | under K7 | PASS: `g` | PASS: SELF_ONLY |
+| 8 | 10 | under K8 | PASS: `h` | PASS: SELF_ONLY |
+| 9 | 2 | under K9 | PASS: layer modifier | PASS: SELF_ONLY |
+| 10 | 5 | under K10 | PASS: layer modifier | PASS: SELF_ONLY |
+| 11 | 8 | under K11 | PASS: left click | PASS: SELF_ONLY |
+| 12 | 11 | under K12 | PASS: right click | PASS: SELF_ONLY |
 
 ## Pass/fail record
 
@@ -164,19 +174,27 @@ is still required before marking the mapping confirmed.
 | USB device | enumerate without opening a port | PASS | IORegistry reports `2E8A:0003`, serial and product above |
 | Recovery | BOOTSEL + RST, UF2 copy, reboot | PASS | `/dev/disk4s1` mounted at `/Volumes/RPI-RP2`; runtime device re-enumerated after UF2 transfer |
 | Keys 1-12 | each expected action occurs | PASS | K1-K8 produced `abcdefgh`; user confirmed K9-K12 matched the current firmware's expected actions |
-| LEDs 1-12 | one-at-a-time RGB test | NOT TESTED | flash/device-control permission required |
-| OLED | full-frame and orientation test | NOT TESTED | flash/device-control permission required |
+| LEDs 1-12 | one-at-a-time RGB test | PASS | user reported ALL_OK; K1-K12 each changed/faded SELF_ONLY, mapping above |
+| OLED | animation and orientation | PASS | animation YES; orientation UPRIGHT |
 | Encoder press | press/release events | PASS | user confirmed expected current-firmware behavior |
-| Encoder rotation | CW/CCW direction and detents | PARTIAL | user reported no problem; CW/CCW effects not recorded |
-| Joystick press | press/release events | NOT TESTED | diagnostic firmware and serial-open permission required |
+| Encoder rotation | CW/CCW direction and detents | PASS WITH CROSS-CHECK | ALL_OK plus fixed product/workshop mapping establishes CW=VolumeUp, CCW=VolumeDown; not separately reported as UP/DOWN text |
+| Joystick press | press/release events | PASS | user reported ALL_OK; no unexpected side effect or stop condition |
 | Joystick X/Y | center and four directions | PASS | stable clusters establish right=+X, left=-X, up=+Y, down=-Y; center envelope recorded below |
 | Diagnostic serial capture | center plus four-direction numeric samples | PASS WITH CAVEAT | retry reached `DONE`/exit 0; physical directions inferred from stable clusters and known order because labels lagged by about one phase |
 
-## Encoder direction candidate
+The final product-firmware checklist result was `ALL_OK`: OLED animation and
+upright orientation, all 12 SELF_ONLY LEDs, encoder rotation and press, and
+joystick press completed with `STOP_REASON=none`.
 
-The fixed upstream source uses encoder A=GP3 and B=GP4 by default. Its
-`invert_rotary_pins` build tag swaps those pins. Which configuration produces
-clockwise and counter-clockwise events on this unit is `NOT TESTED`.
+## Encoder direction
+
+The fixed product source uses encoder A=GP3 and B=GP4 by default, with index 0
+mapped to VolumeDown and index 1 to VolumeUp. The workshop checker uses GP4,GP3
+and reverses its physical `RotaryRight` interpretation. The user reported the
+checklist as ALL_OK with no stop condition. Cross-checking that result against
+both fixed mappings establishes clockwise=VolumeUp and
+counter-clockwise=VolumeDown. The direction was not separately returned as
+literal `UP`/`DOWN` text, so this is recorded as a source-assisted observation.
 
 ## Joystick calibration candidates
 

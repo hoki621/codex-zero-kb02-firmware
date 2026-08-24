@@ -21,7 +21,7 @@ expect {
 		set saw_header 1
 		exp_continue -continue_timer
 	}
-	-re {SUMMARY ([a-z]+) ([0-9]+)} {
+	-re {SUMMARY ([a-z]+) ([0-9]+) ([0-9]+) ([0-9]+) ([0-9]+) ([0-9]+) ([0-9]+) ([0-9]+)[\r\n]} {
 		if {$next_phase >= [llength $phases] ||
 			$expect_out(1,string) ne [lindex $phases $next_phase] ||
 			$expect_out(2,string) ne [lindex $counts $next_phase]} {
@@ -37,5 +37,10 @@ expect {
 		stop_capture 0
 	}
 	timeout { stop_capture 124 }
-	eof { exit 1 }
+	eof {
+		if {$saw_header} {
+			exit 2
+		}
+		exit 1
+	}
 }
