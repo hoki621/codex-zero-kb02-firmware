@@ -9,6 +9,8 @@ import (
 
 	pio "github.com/tinygo-org/pio/rp2-pio"
 	"github.com/tinygo-org/pio/rp2-pio/piolib"
+	"tinygo.org/x/drivers"
+	"tinygo.org/x/drivers/ssd1306"
 )
 
 var (
@@ -136,8 +138,7 @@ func main() {
 			if leds != nil {
 				_ = leds.WriteRaw(frame[:])
 			}
-			display.render(protocol.panel)
-			lastPanel = protocol.panel
+			lastPanel = committedPanel(lastPanel, protocol.panel, display.render(protocol.panel))
 		}
 
 		time.Sleep(time.Millisecond)
@@ -189,8 +190,8 @@ func writeCDC(message string) {
 }
 
 type oled struct {
-	i2c    *machine.I2C
-	buffer [1024]byte
+	display *ssd1306.Device
+	buffer  [1024]byte
 }
 
 func newOLED(i2c *machine.I2C) *oled {
@@ -199,23 +200,17 @@ func newOLED(i2c *machine.I2C) *oled {
 		SDA:       machine.GPIO12,
 		SCL:       machine.GPIO13,
 	})
-	display := &oled{i2c: i2c}
-	display.command([]byte{
-		0xae, 0xd5, 0x80, 0xa8, 0x3f, 0xd3, 0x00, 0x40,
-		0x8d, 0x14, 0x20, 0x02, 0xa0, 0xc0, 0xda, 0x12,
-		0x81, 0x2f, 0xd9, 0xf1, 0xdb, 0x40, 0xa4, 0xa6, 0xaf,
+	device := ssd1306.NewI2C(i2c)
+	device.Configure(ssd1306.Config{
+		Width:    128,
+		Height:   64,
+		Address:  0x3c,
+		Rotation: drivers.Rotation180,
 	})
-	return display
+	return &oled{display: device}
 }
 
-func (d *oled) command(commands []byte) {
-	data := make([]byte, len(commands)+1)
-	data[0] = 0x00
-	copy(data[1:], commands)
-	_ = d.i2c.Tx(0x3c, data, nil)
-}
-
-func (d *oled) render(panel panelState) {
+func (d *oled) render(panel panelState) error {
 	clear(d.buffer[:])
 	if !panel.online {
 		for i := 0; i < 64; i++ {
@@ -235,13 +230,10 @@ func (d *oled) render(panel panelState) {
 			d.drawGlyph(x+27, y+3, panel.states[slot])
 		}
 	}
-	for page := 0; page < 8; page++ {
-		d.command([]byte{byte(0xb0 | page), 0x00, 0x10})
-		var packet [129]byte
-		packet[0] = 0x40
-		copy(packet[1:], d.buffer[page*128:(page+1)*128])
-		_ = d.i2c.Tx(0x3c, packet[:], nil)
+	if err := d.display.SetBuffer(d.buffer[:]); err != nil {
+		return err
 	}
+	return d.display.Display()
 }
 
 func (d *oled) setPixel(x, y int) {

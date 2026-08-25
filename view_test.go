@@ -1,6 +1,20 @@
 package main
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
+
+func TestCommittedPanelRetriesDisplayFailure(t *testing.T) {
+	last := panelState{selected: -1}
+	next := panelState{online: true, selected: 2}
+	if got := committedPanel(last, next, errors.New("display failed")); got != last {
+		t.Fatalf("failed display advanced panel: %+v", got)
+	}
+	if got := committedPanel(last, next, nil); got != next {
+		t.Fatalf("successful display did not advance panel: %+v", got)
+	}
+}
 
 func TestLEDFrameUsesSixAgentKeyLEDsAtLowBrightness(t *testing.T) {
 	panel := panelState{online: true, selected: 2, states: [6]byte{'W', 'I', 'B', 'D', 'U', 'E'}}
