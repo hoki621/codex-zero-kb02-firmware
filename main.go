@@ -36,6 +36,7 @@ func main() {
 	var keys [12]debouncer
 	var keyReported [12]bool
 	var escape escapeInput
+	var popup popupInput
 	var encoderButton debouncer
 	var encoderButtonReported bool
 	var joystickButton debouncer
@@ -97,6 +98,10 @@ func main() {
 			changed, pressed := keys[key].update(raw)
 			if isEscapeKey(key) {
 				writeCDC(escape.update(protocol.generation, protocol.canEmit(), changed, pressed))
+				continue
+			}
+			if isPopupKey(key) {
+				writeCDC(popup.update(protocol.generation, protocol.canEmit(), changed, pressed))
 				continue
 			}
 			if !changed {

@@ -244,6 +244,14 @@ func formatEscape(generation uint64, down bool) string {
 	return "ESC " + strconv.FormatUint(generation, 10) + " " + edge + "\n"
 }
 
+func formatPopup(generation uint64, down bool) string {
+	edge := "UP"
+	if down {
+		edge = "DOWN"
+	}
+	return "POPUP " + strconv.FormatUint(generation, 10) + " " + edge + "\n"
+}
+
 func formatEncoder(generation uint64, event string) string {
 	return "ENC " + strconv.FormatUint(generation, 10) + " " + event + "\n"
 }

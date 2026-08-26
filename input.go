@@ -51,6 +51,10 @@ func isEscapeKey(key int) bool {
 	return key == 0
 }
 
+func isPopupKey(key int) bool {
+	return key == 3
+}
+
 type escapeInput struct {
 	generation uint64
 	reported   bool
@@ -76,6 +80,33 @@ func (e *escapeInput) update(generation uint64, online, changed, pressed bool) s
 	}
 	e.reported = false
 	return formatEscape(generation, false)
+}
+
+type popupInput struct {
+	generation uint64
+	reported   bool
+}
+
+func (p *popupInput) update(generation uint64, online, changed, pressed bool) string {
+	if !online || generation != p.generation {
+		p.generation = generation
+		p.reported = false
+	}
+	if !online || !changed {
+		return ""
+	}
+	if pressed {
+		if p.reported {
+			return ""
+		}
+		p.reported = true
+		return formatPopup(generation, true)
+	}
+	if !p.reported {
+		return ""
+	}
+	p.reported = false
+	return formatPopup(generation, false)
 }
 
 type pushInput uint8

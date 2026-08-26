@@ -128,6 +128,27 @@ func TestK1EscapeUsesDebouncedEdges(t *testing.T) {
 	}
 }
 
+func TestK4PopupUsesDebouncedEdges(t *testing.T) {
+	var button debouncer
+	var popup popupInput
+	var events []string
+	for _, raw := range []bool{false, true, false, true, true, true, true, true, true, false, true, false, false, false, false, false} {
+		changed, pressed := button.update(raw)
+		if event := popup.update(9, true, changed, pressed); event != "" {
+			events = append(events, event)
+		}
+	}
+	want := []string{"POPUP 9 DOWN\n", "POPUP 9 UP\n"}
+	if len(events) != len(want) || events[0] != want[0] || events[1] != want[1] {
+		t.Fatalf("events=%q", events)
+	}
+	for key := range 12 {
+		if isPopupKey(key) != (key == 3) {
+			t.Fatalf("K%d popup=%v", key+1, isPopupKey(key))
+		}
+	}
+}
+
 func TestJoystickPushIsDebouncedAndSafelyIgnored(t *testing.T) {
 	var button debouncer
 	changes := 0
