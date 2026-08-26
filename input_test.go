@@ -107,6 +107,27 @@ func TestOnlySixAgentKeysProduceEvents(t *testing.T) {
 	}
 }
 
+func TestK1EscapeUsesDebouncedEdges(t *testing.T) {
+	var button debouncer
+	var escape escapeInput
+	var events []string
+	for _, raw := range []bool{false, true, false, true, true, true, true, true, true, false, true, false, false, false, false, false} {
+		changed, pressed := button.update(raw)
+		if event := escape.update(9, true, changed, pressed); event != "" {
+			events = append(events, event)
+		}
+	}
+	want := []string{"ESC 9 DOWN\n", "ESC 9 UP\n"}
+	if len(events) != len(want) || events[0] != want[0] || events[1] != want[1] {
+		t.Fatalf("events=%q", events)
+	}
+	for key := range 12 {
+		if isEscapeKey(key) != (key == 0) {
+			t.Fatalf("K%d escape=%v", key+1, isEscapeKey(key))
+		}
+	}
+}
+
 func TestJoystickPushIsDebouncedAndSafelyIgnored(t *testing.T) {
 	var button debouncer
 	changes := 0

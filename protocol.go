@@ -236,6 +236,14 @@ func formatKey(generation uint64, slot int, down bool) string {
 	return "KEY " + strconv.FormatUint(generation, 10) + " " + strconv.Itoa(slot) + " " + edge + "\n"
 }
 
+func formatEscape(generation uint64, down bool) string {
+	edge := "UP"
+	if down {
+		edge = "DOWN"
+	}
+	return "ESC " + strconv.FormatUint(generation, 10) + " " + edge + "\n"
+}
+
 func formatEncoder(generation uint64, event string) string {
 	return "ENC " + strconv.FormatUint(generation, 10) + " " + event + "\n"
 }

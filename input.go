@@ -47,6 +47,37 @@ func slotForKey(key int) (int, bool) {
 	}
 }
 
+func isEscapeKey(key int) bool {
+	return key == 0
+}
+
+type escapeInput struct {
+	generation uint64
+	reported   bool
+}
+
+func (e *escapeInput) update(generation uint64, online, changed, pressed bool) string {
+	if !online || generation != e.generation {
+		e.generation = generation
+		e.reported = false
+	}
+	if !online || !changed {
+		return ""
+	}
+	if pressed {
+		if e.reported {
+			return ""
+		}
+		e.reported = true
+		return formatEscape(generation, true)
+	}
+	if !e.reported {
+		return ""
+	}
+	e.reported = false
+	return formatEscape(generation, false)
+}
+
 type pushInput uint8
 
 const (

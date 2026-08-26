@@ -59,6 +59,41 @@ func TestProtocolHandshakeStatePingAndTimeout(t *testing.T) {
 	}
 }
 
+func TestEscapeDoesNotCrossOfflineOrGenerationReset(t *testing.T) {
+	state := newSession()
+	var escape escapeInput
+	if event := escape.update(state.generation, state.canEmit(), true, true); event != "" {
+		t.Fatalf("pre-session event=%q", event)
+	}
+
+	hello, _ := parseCommand("HELLO HOST 1")
+	state.handle(hello)
+	online, _ := parseCommand("STATE 9 0 IIIIII")
+	state.handle(online)
+	if event := escape.update(state.generation, state.canEmit(), true, true); event != "ESC 9 DOWN\n" {
+		t.Fatalf("online event=%q", event)
+	}
+
+	offline, _ := parseCommand("OFFLINE 10")
+	state.handle(offline)
+	escape.update(state.generation, state.canEmit(), false, true)
+	state.handle(hello)
+	next, _ := parseCommand("STATE 11 0 IIIIII")
+	state.handle(next)
+	if event := escape.update(state.generation, state.canEmit(), true, false); event != "" {
+		t.Fatalf("release replayed after reconnect as %q", event)
+	}
+	if event := escape.update(state.generation, state.canEmit(), true, true); event != "ESC 11 DOWN\n" {
+		t.Fatalf("new generation event=%q", event)
+	}
+	remapped, _ := parseCommand("STATE 12 0 IIIIII")
+	state.handle(remapped)
+	escape.update(state.generation, state.canEmit(), false, true)
+	if event := escape.update(state.generation, state.canEmit(), true, false); event != "" {
+		t.Fatalf("release replayed after generation change as %q", event)
+	}
+}
+
 func TestMalformedCommandsAreRejected(t *testing.T) {
 	for _, line := range []string{
 		" STATE 1 0 WIBDUE",

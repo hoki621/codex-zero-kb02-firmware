@@ -35,6 +35,7 @@ func main() {
 	var parser lineParser
 	var keys [12]debouncer
 	var keyReported [12]bool
+	var escape escapeInput
 	var encoderButton debouncer
 	var encoderButtonReported bool
 	var joystickButton debouncer
@@ -94,6 +95,10 @@ func main() {
 		rawKeys := scanMatrix()
 		for key, raw := range rawKeys {
 			changed, pressed := keys[key].update(raw)
+			if isEscapeKey(key) {
+				writeCDC(escape.update(protocol.generation, protocol.canEmit(), changed, pressed))
+				continue
+			}
 			if !changed {
 				continue
 			}
