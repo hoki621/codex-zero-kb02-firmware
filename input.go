@@ -58,6 +58,10 @@ func isPopupKey(key int) bool {
 	return key == 3
 }
 
+func isNewChatKey(key int) bool {
+	return key == 11
+}
+
 type escapeInput struct {
 	generation uint64
 	reported   bool
@@ -110,6 +114,33 @@ func (p *popupInput) update(generation uint64, online, changed, pressed bool) st
 	}
 	p.reported = false
 	return formatPopup(generation, false)
+}
+
+type newChatInput struct {
+	generation uint64
+	reported   bool
+}
+
+func (n *newChatInput) update(generation uint64, online, changed, pressed bool) string {
+	if !online || generation != n.generation {
+		n.generation = generation
+		n.reported = false
+	}
+	if !online || !changed {
+		return ""
+	}
+	if pressed {
+		if n.reported {
+			return ""
+		}
+		n.reported = true
+		return formatNewChat(generation, true)
+	}
+	if !n.reported {
+		return ""
+	}
+	n.reported = false
+	return formatNewChat(generation, false)
 }
 
 type pushInput uint8

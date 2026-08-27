@@ -39,6 +39,7 @@ func main() {
 	var keyReported [12]bool
 	var escape escapeInput
 	var popup popupInput
+	var newChat newChatInput
 	var encoderButton debouncer
 	var encoderButtonReported bool
 	var joystickButton debouncer
@@ -104,6 +105,10 @@ func main() {
 			}
 			if isPopupKey(key) {
 				writeCDC(popup.update(protocol.generation, protocol.canEmit(), changed, pressed))
+				continue
+			}
+			if isNewChatKey(key) {
+				writeCDC(newChat.update(protocol.generation, protocol.canEmit(), changed, pressed))
 				continue
 			}
 			if !changed {

@@ -172,6 +172,27 @@ func TestK4PopupUsesDebouncedEdges(t *testing.T) {
 	}
 }
 
+func TestK12NewChatUsesDebouncedEdges(t *testing.T) {
+	var button debouncer
+	var newChat newChatInput
+	var events []string
+	for _, raw := range []bool{false, true, false, true, true, true, true, true, true, false, true, false, false, false, false, false} {
+		changed, pressed := button.update(raw)
+		if event := newChat.update(9, true, changed, pressed); event != "" {
+			events = append(events, event)
+		}
+	}
+	want := []string{"NEW 9 DOWN\n", "NEW 9 UP\n"}
+	if len(events) != len(want) || events[0] != want[0] || events[1] != want[1] {
+		t.Fatalf("events=%q", events)
+	}
+	for key := range 12 {
+		if isNewChatKey(key) != (key == 11) {
+			t.Fatalf("K%d new chat=%v", key+1, isNewChatKey(key))
+		}
+	}
+}
+
 func TestJoystickPushIsDebouncedAndSafelyIgnored(t *testing.T) {
 	var button debouncer
 	changes := 0

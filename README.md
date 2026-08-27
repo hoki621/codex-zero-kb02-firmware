@@ -20,9 +20,10 @@ v1 handshake and an online `STATE` before emitting input, bounds each line to
 128 bytes, and enters offline display state after 12 seconds without a valid
 host message.
 
-K1 emits debounced `ESC ... DOWN|UP` edges and K4 emits debounced
-`POPUP ... DOWN|UP` edges. The six protocol agent keys are K2, K3, K5, K6, K7,
-and K8, mapped to slots 0 through 5. K9-K12 are reserved and emit no v1 event.
+K1 emits debounced `ESC ... DOWN|UP` edges, K4 emits debounced
+`POPUP ... DOWN|UP` edges, and K12 emits debounced `NEW ... DOWN|UP` edges.
+The six protocol agent keys are K2, K3, K5, K6, K7, and K8, mapped to slots 0
+through 5. K9-K11 are reserved and emit no v1 event.
 GP0 joystick press is scanned and debounced but also emits no event because v1
 has no joystick-press message. Encoder press alone uses `ENC ... DOWN|UP`.
 The joystick also moves the standard USB HID relative pointer by a fixed three
