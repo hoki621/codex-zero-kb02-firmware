@@ -193,6 +193,33 @@ func TestK12NewChatUsesDebouncedEdges(t *testing.T) {
 	}
 }
 
+func TestK9K10ApprovalUsesDebouncedEdgesAndK11IsUnassigned(t *testing.T) {
+	for key, want := range map[int][]string{
+		8: {"APPROVE 9 DOWN\n", "APPROVE 9 UP\n"},
+		9: {"REJECT 9 DOWN\n", "REJECT 9 UP\n"},
+	} {
+		var button debouncer
+		var events []string
+		for _, raw := range []bool{false, true, false, true, true, true, true, true, true, false, true, false, false, false, false, false} {
+			changed, pressed := button.update(raw)
+			if !changed {
+				continue
+			}
+			event, ok := approvalEvent(key, 9, pressed)
+			if !ok {
+				t.Fatalf("K%d is not an approval key", key+1)
+			}
+			events = append(events, event)
+		}
+		if len(events) != len(want) || events[0] != want[0] || events[1] != want[1] {
+			t.Fatalf("K%d events=%q", key+1, events)
+		}
+	}
+	if event, ok := approvalEvent(10, 9, true); ok || event != "" {
+		t.Fatalf("K11 emitted %q", event)
+	}
+}
+
 func TestJoystickPushIsDebouncedAndSafelyIgnored(t *testing.T) {
 	var button debouncer
 	changes := 0

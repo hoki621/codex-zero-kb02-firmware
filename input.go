@@ -62,6 +62,17 @@ func isNewChatKey(key int) bool {
 	return key == 11
 }
 
+func approvalEvent(key int, generation uint64, down bool) (string, bool) {
+	switch key {
+	case 8:
+		return formatApprove(generation, down), true
+	case 9:
+		return formatReject(generation, down), true
+	default:
+		return "", false
+	}
+}
+
 type escapeInput struct {
 	generation uint64
 	reported   bool

@@ -114,6 +114,16 @@ func main() {
 			if !changed {
 				continue
 			}
+			if event, approvalKey := approvalEvent(key, protocol.generation, pressed); approvalKey {
+				if pressed && protocol.canEmit() {
+					writeCDC(event)
+					keyReported[key] = true
+				} else if !pressed && keyReported[key] {
+					writeCDC(event)
+					keyReported[key] = false
+				}
+				continue
+			}
 			slot, agentKey := slotForKey(key)
 			if !agentKey {
 				continue
