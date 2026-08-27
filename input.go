@@ -1,6 +1,9 @@
 package main
 
-const debounceSamples = 5
+const (
+	debounceSamples     = 5
+	joystickPointerStep = 3
+)
 
 type debouncer struct {
 	stable    bool
@@ -199,14 +202,7 @@ type joystickDecoder struct {
 }
 
 func (d *joystickDecoder) update(rawX, rawY uint16) string {
-	x := int32(rawX) - int32(d.calibration.centerX)
-	y := int32(rawY) - int32(d.calibration.centerY)
-	if d.calibration.invertX {
-		x = -x
-	}
-	if d.calibration.invertY {
-		y = -y
-	}
+	x, y := joystickAxes(rawX, rawY, d.calibration)
 	absX, absY := absolute(x), absolute(y)
 	if d.active {
 		if absX <= int32(d.calibration.release) && absY <= int32(d.calibration.release) {
@@ -214,10 +210,47 @@ func (d *joystickDecoder) update(rawX, rawY uint16) string {
 		}
 		return ""
 	}
-	if absX < int32(d.calibration.enter) && absY < int32(d.calibration.enter) {
+	direction := joystickDirection(x, y, d.calibration.enter)
+	if direction == "" {
 		return ""
 	}
 	d.active = true
+	return direction
+}
+
+func joystickPointerDelta(rawX, rawY uint16, calibration joystickCalibration) (int, int) {
+	x, y := joystickAxes(rawX, rawY, calibration)
+	switch joystickDirection(x, y, calibration.enter) {
+	case "LEFT":
+		return -joystickPointerStep, 0
+	case "RIGHT":
+		return joystickPointerStep, 0
+	case "UP":
+		return 0, -joystickPointerStep
+	case "DOWN":
+		return 0, joystickPointerStep
+	default:
+		return 0, 0
+	}
+}
+
+func joystickAxes(rawX, rawY uint16, calibration joystickCalibration) (int32, int32) {
+	x := int32(rawX) - int32(calibration.centerX)
+	y := int32(rawY) - int32(calibration.centerY)
+	if calibration.invertX {
+		x = -x
+	}
+	if calibration.invertY {
+		y = -y
+	}
+	return x, y
+}
+
+func joystickDirection(x, y int32, deadZone uint16) string {
+	absX, absY := absolute(x), absolute(y)
+	if absX < int32(deadZone) && absY < int32(deadZone) {
+		return ""
+	}
 	if absX >= absY {
 		if x < 0 {
 			return "LEFT"

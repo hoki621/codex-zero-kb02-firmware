@@ -5,6 +5,7 @@ package main
 import (
 	"machine"
 	"machine/usb"
+	"machine/usb/hid/mouse"
 	"time"
 
 	pio "github.com/tinygo-org/pio/rp2-pio"
@@ -28,6 +29,7 @@ func main() {
 	joystickY := machine.ADC{Pin: machine.GPIO28}
 	joystickX.Configure(machine.ADCConfig{})
 	joystickY.Configure(machine.ADCConfig{})
+	pointer := mouse.Port()
 
 	display := newOLED(machine.I2C0)
 	leds := newLEDStrip()
@@ -46,7 +48,7 @@ func main() {
 	lastValid := time.Now()
 	reportGeneration := uint64(0)
 	lastPanel := panelState{selected: -2}
-	loop := uint32(0)
+	lastJoystickReport := time.Time{}
 
 	for {
 		now := time.Now()
@@ -136,12 +138,16 @@ func main() {
 			_, _ = pushEvent(joystickPush, protocol.generation, pressed)
 		}
 
-		if loop%10 == 0 {
-			if direction := joystick.update(joystickX.Get(), joystickY.Get()); direction != "" && protocol.canEmit() {
+		if now.Sub(lastJoystickReport) >= 10*time.Millisecond {
+			lastJoystickReport = now
+			rawX, rawY := joystickX.Get(), joystickY.Get()
+			if dx, dy := joystickPointerDelta(rawX, rawY, zeroKB02Joystick); dx != 0 || dy != 0 {
+				pointer.Move(dx, dy)
+			}
+			if direction := joystick.update(rawX, rawY); direction != "" && protocol.canEmit() {
 				writeCDC(formatJoystick(protocol.generation, direction))
 			}
 		}
-		loop++
 
 		if protocol.panel != lastPanel {
 			frame := ledFrame(protocol.panel)

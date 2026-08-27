@@ -25,6 +25,8 @@ K1 emits debounced `ESC ... DOWN|UP` edges and K4 emits debounced
 and K8, mapped to slots 0 through 5. K9-K12 are reserved and emit no v1 event.
 GP0 joystick press is scanned and debounced but also emits no event because v1
 has no joystick-press message. Encoder press alone uses `ENC ... DOWN|UP`.
+The joystick also moves the standard USB HID relative pointer by a fixed three
+pixels every 10ms outside its calibrated dead zone; it does not click or scroll.
 
 Slot RGB is shown only on the six agent-key LEDs at a maximum channel value of
 16/255. OLED I2C runs at 400kHz and the framebuffer is transmitted only when
