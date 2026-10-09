@@ -1,33 +1,40 @@
 # codex-zero-kb02-firmware
 
-[日本語](README_JA.md) · [System setup and controls](https://github.com/hoki621/codex-zero-kb02#readme)
+[日本語](README_JA.md) · [Full setup and controls](https://github.com/hoki621/codex-zero-kb02/blob/main/README_EN.md)
 
-TinyGo input/display firmware for zero-kb02. It sends physical K1–K12 and signed encoder deltas over USB CDC major 2. The joystick uses standard HID mouse; keyboard output, Vial and push inputs are disabled. Herdr-specific actions belong to Host.
+TinyGo firmware for the zero-kb02 Codex controller. It sends key and encoder input to the Mac, displays conversation states on the OLED and LEDs, and uses the joystick to move the mouse pointer. Use it with the [Host application](https://github.com/hoki621/codex-zero-kb02-host).
 
-## Build and flash
+## Build
 
-From the parent repository, use the versions in `mise.toml`: **TinyGo 0.40.1 / Go 1.25.13**.
+Clone the parent repository with its submodules and run `mise install` as described in the [setup guide](https://github.com/hoki621/codex-zero-kb02/blob/main/README_EN.md#setup). The build uses **TinyGo 0.40.1 / Go 1.25.13**. Run these commands from the parent repository root:
 
 ```sh
-cd firmware
-go test ./...
-go vet ./...
-tinygo build -o /tmp/zero-kb02.uf2 --target waveshare-rp2040-zero -tags kb02_inputonly --stack-size 8kb --size short .
+mise exec -- sh -c 'cd firmware && go test ./... && go vet ./...'
+mise exec -- sh -c 'cd firmware && tinygo build -o /tmp/zero-kb02.uf2 --target waveshare-rp2040-zero -tags kb02_inputonly --stack-size 8kb --size short .'
 ```
 
-Use `mise exec --` with the commands if the pinned tools are not on PATH. `kb02_inputonly` is required: it excludes upstream HID keyboard/Vial initialization. Building does not flash a device.
+The output is `/tmp/zero-kb02.uf2`. The `kb02_inputonly` build tag is required: it excludes HID keyboard and Vial initialization so the keys are handled by Host. Building does not flash the device.
 
-For flashing, stop the bridge and serial monitors, retain the [recovery UF2 and procedure](docs/hardware-diagnostics.md), then enter BOOTSEL mode and copy `/tmp/zero-kb02.uf2` to the `RPI-RP2` drive. After reboot the USB serial identifier is `zero-kb02-v2`. If an agent performs the operation, explicitly authorize the target and flash operation.
+## Flash and connect
 
-## Source and behavior
+1. Stop the Host bridge and serial monitors. Keep the [recovery firmware and instructions](docs/hardware-diagnostics.md) available.
+2. Put the device in BOOTSEL mode. When the `RPI-RP2` drive appears, copy `/tmp/zero-kb02.uf2` to it.
+3. After reboot, the USB serial identifier is `zero-kb02-v2`. Follow the [startup guide](https://github.com/hoki621/codex-zero-kb02/blob/main/README_EN.md#run) to connect Host using the device's actual serial port.
 
-- Matrix scan/debounce: sago35/tinygo-keyboard at `cf173e98f60329b7f7feba941461bb95c065c418`, MIT. The vendored matrix algorithm is unchanged; the adjacent patch isolates input-only code.
-- Pin and LED mapping: MIT-licensed sago35/keyboards zero-kb02 at `4b18114b66637c5909229704c0a503bcdeccc057`, marked at the mapping definitions.
-- Encoder, SSD1306, WS2812B and drawing/font APIs: pinned public libraries in `go.mod`.
-- Local code: major 2 parser/session, bounded queues, joystick calibration and six-slot rendering. No workshop source is copied.
+Keys become active when Host connects and sends an online state. After 12 seconds without a valid heartbeat, the display goes offline and the LEDs turn off. Release held keys after reconnecting.
 
-Full notices are retained in [third_party](third_party/README.md) and [recovery](recovery/sago35-keyboards-LICENSE.txt). Preserve the TomThumb font notice when distributing binaries.
+## Development
 
-The Host must send HELLO and an online STATE before inputs are enabled. Invalid lines do not refresh the 12-second heartbeat. Overflow, offline and reconnect discard queued input; held keys must be released before use. LED brightness is capped at 16/255. Joystick center, dead zones and inversion live in `input.go`; encoder precision/direction and matrix polarity live in `main.go`.
+Firmware uses [USB CDC protocol major 2](https://github.com/hoki621/codex-zero-kb02/blob/main/PROTOCOL.md); major 1 is incompatible. The joystick uses standard HID mouse output. HID keyboard output, Vial and push inputs are disabled.
 
-Tests cover protocol, queues, input filtering and in-memory rendering. The [verification record](https://github.com/hoki621/codex-zero-kb02/blob/main/docs/verification.md) separates builds from physical observations. USB CDC writes are buffered by TinyGo and do not acknowledge delivery; display transfers share the scan loop.
+Joystick calibration, dead zones and direction settings are in `input.go`. Encoder settings and matrix polarity are in `main.go`. LED brightness is capped at 16/255.
+
+Tests cover the protocol, input queues, filtering and in-memory rendering. They do not replace hardware checks; see the [verification record](https://github.com/hoki621/codex-zero-kb02/blob/main/docs/verification.md). Display transfers share the input scan loop, and USB CDC writes do not acknowledge delivery.
+
+## Libraries and licenses
+
+- Matrix scanning and debounce: MIT-licensed [sago35/tinygo-keyboard](https://github.com/sago35/tinygo-keyboard), vendored with an input-only build patch.
+- Pin and LED mapping: MIT-licensed [sago35/keyboards](https://github.com/sago35/keyboards), with source comments at the mapping definitions.
+- Encoder, display, LED and font support: public libraries pinned in `go.mod`.
+
+The device protocol, joystick calibration and six-slot display mapping are local to this project. Source revisions and complete notices are in [third_party](third_party/README.md) and [recovery](recovery/sago35-keyboards-LICENSE.txt). Retain the upstream licenses and TomThumb font notice when distributing binaries.
