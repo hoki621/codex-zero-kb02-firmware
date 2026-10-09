@@ -1,3 +1,5 @@
+// LED order follows sago35/keyboards zero-kb02 at 4b18114 (MIT).
+// See recovery/sago35-keyboards-LICENSE.txt; rendering and state colors are local.
 package main
 
 const maxLEDChannel = 16
@@ -18,7 +20,7 @@ var slotLEDIndices = [slotCount]int{3, 6, 1, 4, 7, 10}
 func ledFrame(panel panelState) [12]uint32 {
 	var frame [12]uint32
 	for slot := range slotCount {
-		color := rgb{r: 4}
+		color := rgb{}
 		if panel.online {
 			color = stateColor(panel.states[slot])
 			if panel.selected == int8(slot) {

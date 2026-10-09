@@ -1,36 +1,33 @@
 # codex-zero-kb02-firmware
 
-TinyGo firmware for the unofficial
-[`codex-zero-kb02`](https://github.com/hoki621/codex-zero-kb02) project.
+[日本語](README_JA.md) · [System setup and controls](https://github.com/hoki621/codex-zero-kb02#readme)
 
-Implementation work is tracked in the parent repository. This repository owns
-zero-kb02 input scanning, RGB/OLED rendering, and the bounded USB CDC protocol.
-It contains no Herdr-specific logic.
+TinyGo input/display firmware for zero-kb02. It sends physical K1–K12 and signed encoder deltas over USB CDC major 2. The joystick uses standard HID mouse; keyboard output, Vial and push inputs are disabled. Herdr-specific actions belong to Host.
 
-## Firmware v1
+## Build and flash
 
-Build the RP2040 UF2 with the pinned TinyGo toolchain:
+From the parent repository, use the versions in `mise.toml`: **TinyGo 0.40.1 / Go 1.25.13**.
 
 ```sh
-tinygo build -o /absolute/output.uf2 --target waveshare-rp2040-zero --stack-size 8kb --size short .
+cd firmware
+go test ./...
+go vet ./...
+tinygo build -o /tmp/zero-kb02.uf2 --target waveshare-rp2040-zero -tags kb02_inputonly --stack-size 8kb --size short .
 ```
 
-The USB CDC implementation follows the parent `PROTOCOL.md`: it requires the
-v1 handshake and an online `STATE` before emitting input, bounds each line to
-128 bytes, and enters offline display state after 12 seconds without a valid
-host message.
+Use `mise exec --` with the commands if the pinned tools are not on PATH. `kb02_inputonly` is required: it excludes upstream HID keyboard/Vial initialization. Building does not flash a device.
 
-K1 emits debounced `ESC ... DOWN|UP` edges, K4 emits debounced
-`POPUP ... DOWN|UP` edges, and K12 emits debounced `NEW ... DOWN|UP` edges.
-The six protocol agent keys are K2, K3, K5, K6, K7, and K8, mapped to slots 0
-through 5. K9 emits `APPROVE ... DOWN|UP`, K10 emits
-`REJECT ... DOWN|UP`, and K11 remains reserved with no v1 event.
-GP0 joystick press is scanned and debounced but also emits no event because v1
-has no joystick-press message. Encoder press alone uses `ENC ... DOWN|UP`.
-The joystick also moves the standard USB HID relative pointer by a fixed three
-pixels every 10ms outside its calibrated dead zone; it does not click or scroll.
+For flashing, stop the bridge and serial monitors, retain the [recovery UF2 and procedure](docs/hardware-diagnostics.md), then enter BOOTSEL mode and copy `/tmp/zero-kb02.uf2` to the `RPI-RP2` drive. After reboot the USB serial identifier is `zero-kb02-v2`. If an agent performs the operation, explicitly authorize the target and flash operation.
 
-Slot RGB is shown only on the six agent-key LEDs at a maximum channel value of
-16/255. OLED I2C runs at 400kHz and the framebuffer is transmitted only when
-the six-slot panel state changes. Joystick calibration is defined once in
-`input.go`.
+## Source and behavior
+
+- Matrix scan/debounce: sago35/tinygo-keyboard at `cf173e98f60329b7f7feba941461bb95c065c418`, MIT. The vendored matrix algorithm is unchanged; the adjacent patch isolates input-only code.
+- Pin and LED mapping: MIT-licensed sago35/keyboards zero-kb02 at `4b18114b66637c5909229704c0a503bcdeccc057`, marked at the mapping definitions.
+- Encoder, SSD1306, WS2812B and drawing/font APIs: pinned public libraries in `go.mod`.
+- Local code: major 2 parser/session, bounded queues, joystick calibration and six-slot rendering. No workshop source is copied.
+
+Full notices are retained in [third_party](third_party/README.md) and [recovery](recovery/sago35-keyboards-LICENSE.txt). Preserve the TomThumb font notice when distributing binaries.
+
+The Host must send HELLO and an online STATE before inputs are enabled. Invalid lines do not refresh the 12-second heartbeat. Overflow, offline and reconnect discard queued input; held keys must be released before use. LED brightness is capped at 16/255. Joystick center, dead zones and inversion live in `input.go`; encoder precision/direction and matrix polarity live in `main.go`.
+
+Tests cover protocol, queues, input filtering and in-memory rendering. The [verification record](https://github.com/hoki621/codex-zero-kb02/blob/main/docs/verification.md) separates builds from physical observations. USB CDC writes are buffered by TinyGo and do not acknowledge delivery; display transfers share the scan loop.

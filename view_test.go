@@ -35,3 +35,9 @@ func TestLEDFrameUsesSixAgentKeyLEDsAtLowBrightness(t *testing.T) {
 		}
 	}
 }
+
+func TestOfflineLEDsAreOff(t *testing.T) {
+	if got := ledFrame(offlinePanel()); got != [12]uint32{} {
+		t.Fatal(got)
+	}
+}

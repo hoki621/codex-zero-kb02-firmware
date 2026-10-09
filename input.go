@@ -1,226 +1,65 @@
 package main
 
 const (
-	debounceSamples     = 5
 	joystickPointerStep = 3
+	// Upstream matrix debounce is 8: nine None samples exclude a latent press.
+	matrixSettleSamples = 9
+	matrixInvertDiode   = false
+	encoderPrecision    = 4
+	encoderDirection    = 1 // Change to -1 only after a physical direction check.
 )
 
-type debouncer struct {
-	stable    bool
-	candidate bool
-	count     uint8
+type keyInput struct {
+	blocked      [12]bool
+	reported     [12]bool
+	quietSamples [12]uint8
 }
 
-func (d *debouncer) update(raw bool) (changed, pressed bool) {
-	if raw == d.stable {
-		d.candidate = raw
-		d.count = 0
-		return false, d.stable
-	}
-	if raw != d.candidate {
-		d.candidate = raw
-		d.count = 1
-	} else if d.count < debounceSamples {
-		d.count++
-	}
-	if d.count < debounceSamples {
-		return false, d.stable
-	}
-	d.stable = raw
-	d.count = 0
-	return true, d.stable
-}
-
-func slotForKey(key int) (int, bool) {
-	switch key {
-	case 1:
-		return 0, true
-	case 2:
-		return 1, true
-	case 4:
-		return 2, true
-	case 5:
-		return 3, true
-	case 6:
-		return 4, true
-	case 7:
-		return 5, true
-	default:
-		return 0, false
+func (k *keyInput) reset() {
+	// A held key must be released before it can become an action in a new session.
+	*k = keyInput{}
+	for i := range k.blocked {
+		k.blocked[i] = true
 	}
 }
 
-func isEscapeKey(key int) bool {
-	return key == 0
-}
-
-func isPopupKey(key int) bool {
-	return key == 3
-}
-
-func isNewChatKey(key int) bool {
-	return key == 11
-}
-
-func approvalEvent(key int, generation uint64, down bool) (string, bool) {
-	switch key {
-	case 8:
-		return formatApprove(generation, down), true
-	case 9:
-		return formatReject(generation, down), true
-	default:
-		return "", false
-	}
-}
-
-type escapeInput struct {
-	generation uint64
-	reported   bool
-}
-
-func (e *escapeInput) update(generation uint64, online, changed, pressed bool) string {
-	if !online || generation != e.generation {
-		e.generation = generation
-		e.reported = false
-	}
-	if !online || !changed {
+func (k *keyInput) update(key int, generation uint64, online, changed, pressed bool) string {
+	if !online {
+		k.blocked[key] = true
+		k.reported[key] = false
+		k.quietSamples[key] = 0
 		return ""
 	}
-	if pressed {
-		if e.reported {
+	if k.blocked[key] {
+		if changed && !pressed {
+			k.blocked[key] = false
 			return ""
 		}
-		e.reported = true
-		return formatEscape(generation, true)
-	}
-	if !e.reported {
+		if pressed {
+			k.quietSamples[key] = 0
+		} else if k.quietSamples[key] < matrixSettleSamples {
+			k.quietSamples[key]++
+		}
+		if k.quietSamples[key] == matrixSettleSamples {
+			k.blocked[key] = false
+		}
 		return ""
 	}
-	e.reported = false
-	return formatEscape(generation, false)
-}
-
-type popupInput struct {
-	generation uint64
-	reported   bool
-}
-
-func (p *popupInput) update(generation uint64, online, changed, pressed bool) string {
-	if !online || generation != p.generation {
-		p.generation = generation
-		p.reported = false
-	}
-	if !online || !changed {
+	if !changed {
 		return ""
 	}
 	if pressed {
-		if p.reported {
+		if k.reported[key] {
 			return ""
 		}
-		p.reported = true
-		return formatPopup(generation, true)
-	}
-	if !p.reported {
-		return ""
-	}
-	p.reported = false
-	return formatPopup(generation, false)
-}
-
-type newChatInput struct {
-	generation uint64
-	reported   bool
-}
-
-func (n *newChatInput) update(generation uint64, online, changed, pressed bool) string {
-	if !online || generation != n.generation {
-		n.generation = generation
-		n.reported = false
-	}
-	if !online || !changed {
-		return ""
-	}
-	if pressed {
-		if n.reported {
+		k.reported[key] = true
+	} else {
+		if !k.reported[key] {
 			return ""
 		}
-		n.reported = true
-		return formatNewChat(generation, true)
+		k.reported[key] = false
 	}
-	if !n.reported {
-		return ""
-	}
-	n.reported = false
-	return formatNewChat(generation, false)
-}
-
-type pushInput uint8
-
-const (
-	encoderPush pushInput = iota
-	joystickPush
-)
-
-func pushEvent(input pushInput, generation uint64, pressed bool) (string, bool) {
-	if input != encoderPush {
-		return "", false
-	}
-	edge := "UP"
-	if pressed {
-		edge = "DOWN"
-	}
-	return formatEncoder(generation, edge), true
-}
-
-type encoderDecoder struct {
-	initialized bool
-	state       uint8
-	steps       int8
-}
-
-var encoderTransitions = [16]int8{0, -1, 1, 0, 1, 0, 0, -1, -1, 0, 0, 1, 0, 1, -1, 0}
-
-func (d *encoderDecoder) reset(a, b bool) {
-	d.initialized = true
-	d.state = encoderState(a, b)
-	d.steps = 0
-}
-
-func (d *encoderDecoder) update(a, b bool) string {
-	next := encoderState(a, b)
-	if !d.initialized {
-		d.initialized = true
-		d.state = next
-		return ""
-	}
-	previous := d.state
-	d.state = next
-	delta := encoderTransitions[(previous<<2)|next]
-	if delta == 0 && previous != next {
-		d.steps = 0
-		return ""
-	}
-	d.steps += delta
-	if d.steps >= 4 {
-		d.steps = 0
-		return "CW"
-	}
-	if d.steps <= -4 {
-		d.steps = 0
-		return "CCW"
-	}
-	return ""
-}
-
-func encoderState(a, b bool) uint8 {
-	state := uint8(0)
-	if a {
-		state |= 2
-	}
-	if b {
-		state |= 1
-	}
-	return state
+	return formatKey(generation, key+1, pressed)
 }
 
 type joystickCalibration struct {
@@ -236,28 +75,6 @@ var zeroKB02Joystick = joystickCalibration{
 	release: 4096,
 	invertX: false,
 	invertY: true,
-}
-
-type joystickDecoder struct {
-	calibration joystickCalibration
-	active      bool
-}
-
-func (d *joystickDecoder) update(rawX, rawY uint16) string {
-	x, y := joystickAxes(rawX, rawY, d.calibration)
-	absX, absY := absolute(x), absolute(y)
-	if d.active {
-		if absX <= int32(d.calibration.release) && absY <= int32(d.calibration.release) {
-			d.active = false
-		}
-		return ""
-	}
-	direction := joystickDirection(x, y, d.calibration.enter)
-	if direction == "" {
-		return ""
-	}
-	d.active = true
-	return direction
 }
 
 func joystickPointerDelta(rawX, rawY uint16, calibration joystickCalibration) (int, int) {
@@ -289,6 +106,7 @@ func joystickAxes(rawX, rawY uint16, calibration joystickCalibration) (int32, in
 }
 
 func joystickDirection(x, y int32, deadZone uint16) string {
+	// Pick the stronger axis to avoid diagonal jitter on this two-axis joystick.
 	absX, absY := absolute(x), absolute(y)
 	if absX < int32(deadZone) && absY < int32(deadZone) {
 		return ""
