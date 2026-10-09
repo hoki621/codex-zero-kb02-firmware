@@ -16,6 +16,7 @@ type keyInput struct {
 }
 
 func (k *keyInput) reset() {
+	// A held key must be released before it can become an action in a new session.
 	*k = keyInput{}
 	for i := range k.blocked {
 		k.blocked[i] = true
@@ -105,6 +106,7 @@ func joystickAxes(rawX, rawY uint16, calibration joystickCalibration) (int32, in
 }
 
 func joystickDirection(x, y int32, deadZone uint16) string {
+	// Pick the stronger axis to avoid diagonal jitter on this two-axis joystick.
 	absX, absY := absolute(x), absolute(y)
 	if absX < int32(deadZone) && absY < int32(deadZone) {
 		return ""

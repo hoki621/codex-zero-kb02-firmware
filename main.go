@@ -3,22 +3,30 @@
 package main
 
 import (
-	keyboard "github.com/sago35/tinygo-keyboard"
 	"machine"
 	"machine/usb"
 	"machine/usb/hid/mouse"
 	"time"
-	"tinygo.org/x/drivers/encoders"
 
+	keyboard "github.com/sago35/tinygo-keyboard"
 	pio "github.com/tinygo-org/pio/rp2-pio"
 	"github.com/tinygo-org/pio/rp2-pio/piolib"
 	"tinygo.org/x/drivers"
+	"tinygo.org/x/drivers/encoders"
 	"tinygo.org/x/drivers/ssd1306"
 )
 
+// Pin mapping follows sago35/keyboards zero-kb02 at 4b18114 (MIT).
+// See recovery/sago35-keyboards-LICENSE.txt; no workshop source is copied.
 var (
 	columnPins = [4]machine.Pin{machine.GPIO5, machine.GPIO6, machine.GPIO7, machine.GPIO8}
 	rowPins    = [3]machine.Pin{machine.GPIO9, machine.GPIO10, machine.GPIO11}
+)
+
+const (
+	scanPeriod           = time.Millisecond
+	joystickReportPeriod = 10 * time.Millisecond
+	maxSerialReads       = 32
 )
 
 func main() {
@@ -47,26 +55,25 @@ func main() {
 	lastValid := time.Now()
 	reportRevision := ^uint32(0)
 	lastPanel := panelState{selected: -2}
-	lastJoystickReport := time.Time{}
-	lastEncoderPosition := int32(0)
+	var lastJoystickReport time.Time
+	var lastEncoderPosition int32
 
 	for {
 		now := time.Now()
 		dtr := machine.Serial.DTR()
-		if dtr && !connected {
-			connected = true
+		// DTR marks a new Host connection; old input must not cross that boundary.
+		if dtr != connected {
+			connected = dtr
 			parser.reset()
 			protocol.resetUSB()
-			lastValid = now
-		}
-		if !dtr && connected {
-			connected = false
-			parser.reset()
-			protocol.resetUSB()
+			if connected {
+				lastValid = now
+			}
 		}
 
 		if connected {
-			for reads := 0; reads < 32 && machine.Serial.Buffered() > 0; reads++ {
+			// Bound receive work so a busy Host cannot starve the input scan.
+			for reads := 0; reads < maxSerialReads && machine.Serial.Buffered() > 0; reads++ {
 				b, err := machine.Serial.ReadByte()
 				if err != nil {
 					break
@@ -87,6 +94,7 @@ func main() {
 		}
 
 		states := matrix.Get()
+		// Discard queued edges and fractional rotation on every session change.
 		if protocol.revision != reportRevision {
 			outgoing.reset()
 			input.reset()
@@ -114,7 +122,7 @@ func main() {
 			writeCDC(outgoing.pop())
 		}
 
-		if now.Sub(lastJoystickReport) >= 10*time.Millisecond {
+		if now.Sub(lastJoystickReport) >= joystickReportPeriod {
 			lastJoystickReport = now
 			rawX, rawY := joystickX.Get(), joystickY.Get()
 			if dx, dy := joystickPointerDelta(rawX, rawY, zeroKB02Joystick); dx != 0 || dy != 0 {
@@ -122,6 +130,7 @@ func main() {
 			}
 		}
 
+		// Commit only successful output so a failed transfer is retried next scan.
 		if protocol.panel != lastPanel {
 			frame := ledFrame(protocol.panel)
 			var ledErr error
@@ -135,7 +144,7 @@ func main() {
 			lastPanel = committedPanel(lastPanel, protocol.panel, ledErr)
 		}
 
-		time.Sleep(time.Millisecond)
+		time.Sleep(scanPeriod)
 	}
 }
 
@@ -153,6 +162,7 @@ func newLEDStrip() *piolib.WS2812B {
 
 func writeCDC(message string) {
 	if message != "" {
+		// TinyGo buffers CDC writes; this does not acknowledge delivery to the Host.
 		_, _ = machine.Serial.Write([]byte(message))
 	}
 }

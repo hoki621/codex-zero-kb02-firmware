@@ -1,4 +1,4 @@
-# Fixed input-only dependency
+# Vendored upstream dependency
 
 sago35/tinygo-keyboard cf173e98f60329b7f7feba941461bb95c065c418 (MIT).
 Contains upstream root module sources and keycodes; examples/docs/tools omitted.

@@ -58,6 +58,7 @@ func (p *lineParser) feed(b byte) (command, bool) {
 		return parseCommand(string(line))
 	}
 	if p.length == len(p.buffer) {
+		// Drop the whole overlong line; its tail must not become another command.
 		p.length = 0
 		p.dropping = true
 		return command{}, false
@@ -167,7 +168,7 @@ type session struct {
 	handshake  bool
 	panel      panelState
 	generation uint64
-	revision   uint32
+	revision   uint32 // Local reset token; changes even when the wire generation is reused.
 }
 
 func newSession() session {

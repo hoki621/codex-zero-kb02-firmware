@@ -1,3 +1,5 @@
+// LED order follows sago35/keyboards zero-kb02 at 4b18114 (MIT).
+// See recovery/sago35-keyboards-LICENSE.txt; rendering and state colors are local.
 package main
 
 const maxLEDChannel = 16

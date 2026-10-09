@@ -2,6 +2,7 @@ package main
 
 import (
 	"image/color"
+
 	"tinygo.org/x/drivers"
 	"tinygo.org/x/tinydraw"
 	"tinygo.org/x/tinyfont"
