@@ -1,0 +1,156 @@
+diff --git a/combo.go b/combo.go
+index 7c824a0..fd9ee97 100644
+--- a/combo.go
++++ b/combo.go
+@@ -1,4 +1,4 @@
+-//go:build tinygo
++//go:build tinygo && !kb02_inputonly
+ 
+ package keyboard
+ 
+diff --git a/kbduplexmatrix.go b/kbduplexmatrix.go
+index c0f637d..6b0d1fc 100644
+--- a/kbduplexmatrix.go
++++ b/kbduplexmatrix.go
+@@ -1,4 +1,4 @@
+-//go:build tinygo
++//go:build tinygo && !kb02_inputonly
+ 
+ package keyboard
+ 
+diff --git a/kbexpander.go b/kbexpander.go
+index da854a1..1e11434 100644
+--- a/kbexpander.go
++++ b/kbexpander.go
+@@ -1,4 +1,4 @@
+-//go:build tinygo
++//go:build tinygo && !kb02_inputonly
+ 
+ package keyboard
+ 
+diff --git a/kbgpio.go b/kbgpio.go
+index c3d78f6..7e314a7 100644
+--- a/kbgpio.go
++++ b/kbgpio.go
+@@ -1,4 +1,4 @@
+-//go:build tinygo
++//go:build tinygo && !kb02_inputonly
+ 
+ package keyboard
+ 
+diff --git a/kbrotary.go b/kbrotary.go
+index a6532d0..97c3e93 100644
+--- a/kbrotary.go
++++ b/kbrotary.go
+@@ -1,4 +1,4 @@
+-//go:build tinygo && (rp2040 || rp2350 || stm32 || k210 || esp32c3 || nrf || (avr && (atmega328p || atmega328pb)))
++//go:build tinygo && (rp2040 || rp2350 || stm32 || k210 || esp32c3 || nrf || (avr && (atmega328p || atmega328pb))) && !kb02_inputonly
+ 
+ package keyboard
+ 
+diff --git a/kbshifter.go b/kbshifter.go
+index 0897884..ce1e981 100644
+--- a/kbshifter.go
++++ b/kbshifter.go
+@@ -1,4 +1,4 @@
+-//go:build tinygo
++//go:build tinygo && !kb02_inputonly
+ 
+ package keyboard
+ 
+diff --git a/kbsquaredmatrix.go b/kbsquaredmatrix.go
+index 141f879..ae2e8a6 100644
+--- a/kbsquaredmatrix.go
++++ b/kbsquaredmatrix.go
+@@ -1,4 +1,4 @@
+-//go:build tinygo
++//go:build tinygo && !kb02_inputonly
+ 
+ package keyboard
+ 
+diff --git a/kbuart.go b/kbuart.go
+index 0f8bb47..74ac6b1 100644
+--- a/kbuart.go
++++ b/kbuart.go
+@@ -1,4 +1,4 @@
+-//go:build tinygo
++//go:build tinygo && !kb02_inputonly
+ 
+ package keyboard
+ 
+diff --git a/keyboard.go b/keyboard.go
+index 965bd40..6ba2191 100644
+--- a/keyboard.go
++++ b/keyboard.go
+@@ -1,4 +1,4 @@
+-//go:build tinygo
++//go:build tinygo && !kb02_inputonly
+ 
+ package keyboard
+ 
+diff --git a/macros.go b/macros.go
+index cf79efb..709940c 100644
+--- a/macros.go
++++ b/macros.go
+@@ -1,4 +1,4 @@
+-//go:build tinygo
++//go:build tinygo && !kb02_inputonly
+ 
+ package keyboard
+ 
+diff --git a/mouse.go b/mouse.go
+index 42e4b15..73ca2bc 100644
+--- a/mouse.go
++++ b/mouse.go
+@@ -1,4 +1,4 @@
+-//go:build tinygo
++//go:build tinygo && !kb02_inputonly
+ 
+ package keyboard
+ 
+diff --git a/reset_to_default.go b/reset_to_default.go
+index a60bb36..ab80f82 100644
+--- a/reset_to_default.go
++++ b/reset_to_default.go
+@@ -1,4 +1,4 @@
+-//go:build reset_to_default
++//go:build reset_to_default && !kb02_inputonly
+ 
+ package keyboard
+ 
+diff --git a/via.go b/via.go
+index 9e94d70..7cb10cf 100644
+--- a/via.go
++++ b/via.go
+@@ -1,4 +1,4 @@
+-//go:build tinygo
++//go:build tinygo && !kb02_inputonly
+ 
+ package keyboard
+ 
+diff --git a/input_only.go b/input_only.go
+new file mode 100644
+index 0000000..c556940
+--- /dev/null
++++ b/input_only.go
+@@ -0,0 +1,20 @@
++//go:build tinygo && kb02_inputonly
++
++package keyboard
++
++// Input-only build: the upstream matrix scanner/debounce is unchanged.
++// No USB keyboard, Vial, flash configuration, macros or output dispatcher.
++type Device struct{ kb []*MatrixKeyboard }
++type Keycode uint16
++type State uint8
++
++const (
++	None State = iota
++	NoneToPress
++	Press
++	PressToRelease
++)
++
++type Callback func(layer, index int, state State)
++
++func New() *Device { return &Device{} }

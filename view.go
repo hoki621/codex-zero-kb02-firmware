@@ -18,7 +18,7 @@ var slotLEDIndices = [slotCount]int{3, 6, 1, 4, 7, 10}
 func ledFrame(panel panelState) [12]uint32 {
 	var frame [12]uint32
 	for slot := range slotCount {
-		color := rgb{r: 4}
+		color := rgb{}
 		if panel.online {
 			color = stateColor(panel.states[slot])
 			if panel.selected == int8(slot) {

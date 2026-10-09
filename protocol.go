@@ -9,6 +9,7 @@ import (
 const (
 	maxLineBytes     = 128
 	slotCount        = 6
+	protocolMajor    = 2
 	heartbeatTimeout = 12 * time.Second
 )
 
@@ -110,6 +111,9 @@ func parseCommand(line string) (command, bool) {
 			}
 			states[i] = parts[3][i]
 		}
+		if selected >= 0 && states[selected] == 'E' {
+			return command{}, false
+		}
 		return command{kind: commandState, generation: generation, selected: selected, states: states}, true
 	case "PING":
 		if len(parts) != 2 {
@@ -163,6 +167,7 @@ type session struct {
 	handshake  bool
 	panel      panelState
 	generation uint64
+	revision   uint32
 }
 
 func newSession() session {
@@ -175,6 +180,7 @@ func offlinePanel() panelState {
 
 func (s *session) resetUSB() bool {
 	changed := s.panel != offlinePanel()
+	s.revision++
 	s.handshake = false
 	s.generation = 0
 	s.panel = offlinePanel()
@@ -184,10 +190,11 @@ func (s *session) resetUSB() bool {
 func (s *session) handle(cmd command) (reply string, accepted, changed bool) {
 	if cmd.kind == commandHello {
 		before := s.panel
-		s.handshake = cmd.major == 1
+		s.revision++
+		s.handshake = cmd.major == protocolMajor
 		s.generation = 0
 		s.panel = offlinePanel()
-		return "HELLO ZERO-KB02 1\n", true, before != s.panel
+		return "HELLO ZERO-KB02 2\n", s.handshake, before != s.panel
 	}
 	if !s.handshake {
 		return "", false, false
@@ -196,6 +203,9 @@ func (s *session) handle(cmd command) (reply string, accepted, changed bool) {
 	switch cmd.kind {
 	case commandState:
 		before := s.panel
+		if s.generation != cmd.generation || !s.panel.online {
+			s.revision++
+		}
 		s.generation = cmd.generation
 		s.panel = panelState{online: true, selected: cmd.selected, states: cmd.states}
 		return "", true, before != s.panel
@@ -203,7 +213,8 @@ func (s *session) handle(cmd command) (reply string, accepted, changed bool) {
 		return "PONG " + strconv.FormatUint(uint64(cmd.sequence), 10) + "\n", true, false
 	case commandOffline:
 		before := s.panel
-		s.generation = 0
+		s.revision++
+		s.generation = cmd.generation
 		s.panel = offlinePanel()
 		return "", true, before != s.panel
 	default:
@@ -212,11 +223,10 @@ func (s *session) handle(cmd command) (reply string, accepted, changed bool) {
 }
 
 func (s *session) expire() bool {
-	if !s.handshake || !s.panel.online {
+	if !s.handshake {
 		return false
 	}
-	s.generation = 0
-	s.panel = offlinePanel()
+	s.resetUSB()
 	return true
 }
 
@@ -228,58 +238,20 @@ func heartbeatExpired(elapsed time.Duration) bool {
 	return elapsed >= heartbeatTimeout
 }
 
-func formatKey(generation uint64, slot int, down bool) string {
+func formatKey(generation uint64, key int, down bool) string {
+	if generation == 0 || key < 1 || key > 12 {
+		return ""
+	}
 	edge := "UP"
 	if down {
 		edge = "DOWN"
 	}
-	return "KEY " + strconv.FormatUint(generation, 10) + " " + strconv.Itoa(slot) + " " + edge + "\n"
+	return "KEY " + strconv.FormatUint(generation, 10) + " " + strconv.Itoa(key) + " " + edge + "\n"
 }
 
-func formatEscape(generation uint64, down bool) string {
-	edge := "UP"
-	if down {
-		edge = "DOWN"
+func formatEncoder(generation uint64, delta int) string {
+	if generation == 0 || delta == 0 || delta < -32 || delta > 32 {
+		return ""
 	}
-	return "ESC " + strconv.FormatUint(generation, 10) + " " + edge + "\n"
-}
-
-func formatPopup(generation uint64, down bool) string {
-	edge := "UP"
-	if down {
-		edge = "DOWN"
-	}
-	return "POPUP " + strconv.FormatUint(generation, 10) + " " + edge + "\n"
-}
-
-func formatNewChat(generation uint64, down bool) string {
-	edge := "UP"
-	if down {
-		edge = "DOWN"
-	}
-	return "NEW " + strconv.FormatUint(generation, 10) + " " + edge + "\n"
-}
-
-func formatApprove(generation uint64, down bool) string {
-	edge := "UP"
-	if down {
-		edge = "DOWN"
-	}
-	return "APPROVE " + strconv.FormatUint(generation, 10) + " " + edge + "\n"
-}
-
-func formatReject(generation uint64, down bool) string {
-	edge := "UP"
-	if down {
-		edge = "DOWN"
-	}
-	return "REJECT " + strconv.FormatUint(generation, 10) + " " + edge + "\n"
-}
-
-func formatEncoder(generation uint64, event string) string {
-	return "ENC " + strconv.FormatUint(generation, 10) + " " + event + "\n"
-}
-
-func formatJoystick(generation uint64, direction string) string {
-	return "JOY " + strconv.FormatUint(generation, 10) + " " + direction + "\n"
+	return "ENC " + strconv.FormatUint(generation, 10) + " " + strconv.Itoa(delta) + "\n"
 }
